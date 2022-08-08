@@ -5,27 +5,27 @@ import (
 	"github.com/google/uuid"
 )
 
-type Coordinator struct {
+type Member struct {
 	ID      ID     `db:"id"`
 	GroupID ID     `db:"group_id"`
 	UserID  ID     `db:"user_id"`
 	Role    string `db:"role"`
 }
 
-func AddCoordinator(c Coordinator) (Coordinator, error) {
+func AddMember(c Member) (Member, error) {
 	id := uuid.New().String()
-	if _, err := db.Exec("INSERT INTO `coordinators` SET `id`=?,`group_id`=?,`user_id`=?",
+	if _, err := db.Exec("INSERT INTO `members` SET `id`=?,`group_id`=?,`user_id`=?",
 		id,
 		c.GroupID,
 		c.UserID,
 	); err != nil {
-		return Coordinator{}, errors.Wrapf(err, "failed to add coordinator")
+		return Member{}, errors.Wrapf(err, "failed to add member")
 	}
 	c.ID = ID(id)
 	return c, nil
 }
 
-type CoordinatorListEntry struct {
+type MemberListEntry struct {
 	ID        ID     `db:"id"`
 	GroupID   ID     `db:"group_id"`
 	UserID    ID     `db:"user_id"`
@@ -34,20 +34,20 @@ type CoordinatorListEntry struct {
 	UserPhone string `db:"phone"`
 }
 
-func ListGroupCoordinators(groupID ID) ([]CoordinatorListEntry, error) {
-	var coordinators []CoordinatorListEntry
-	if err := db.Select(&coordinators,
-		"SELECT c.`id`,c.`user_id`,c.`role`,u.`name`,u.`phone` FROM `coordinators` as c JOIN `users` as u ON c.`user_id`=u.`id` WHERE c.`group_id`=? ORDER BY u.`name`",
+func ListGroupMembers(groupID ID) ([]MemberListEntry, error) {
+	var members []MemberListEntry
+	if err := db.Select(&members,
+		"SELECT c.`id`,c.`user_id`,c.`role`,u.`name`,u.`phone` FROM `members` as c JOIN `users` as u ON c.`user_id`=u.`id` WHERE c.`group_id`=? ORDER BY u.`name`",
 		groupID,
 	); err != nil {
-		return nil, errors.Wrapf(err, "failed to list group coordinators")
+		return nil, errors.Wrapf(err, "failed to list group members")
 	}
-	return coordinators, nil
+	return members, nil
 }
 
-func DelCoordinator(id string) error {
-	if _, err := db.Exec("DELETE FROM `coordinators` WHERE id=?", id); err != nil {
-		return errors.Wrapf(err, "failed to delete coordinator(id=%s)", id)
+func DelMember(id string) error {
+	if _, err := db.Exec("DELETE FROM `members` WHERE id=?", id); err != nil {
+		return errors.Wrapf(err, "failed to delete member(id=%s)", id)
 	}
 	return nil
 }

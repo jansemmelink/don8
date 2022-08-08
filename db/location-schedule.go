@@ -8,21 +8,21 @@ import (
 )
 
 type LocationSchedule struct {
-	ID            ID
-	LocationID    ID
-	OpenTime      SqlTime
-	CloseTime     SqlTime
-	CoordinatorID ID
+	ID         ID
+	LocationID ID
+	OpenTime   SqlTime
+	CloseTime  SqlTime
+	MemberID   ID
 }
 
 func AddLocationSchedule(ls LocationSchedule) (LocationSchedule, error) {
 	id := uuid.New().String()
-	if _, err := db.Exec("INSERT into `location_schedules` SET id=?,location_id=?,open_time=?,close_time=?,coordinator_id=?",
+	if _, err := db.Exec("INSERT into `location_schedules` SET id=?,location_id=?,open_time=?,close_time=?,member_id=?",
 		id,
 		ls.LocationID,
 		ls.OpenTime,
 		ls.CloseTime,
-		ls.CoordinatorID,
+		ls.MemberID,
 	); err != nil {
 		return LocationSchedule{}, errors.Wrapf(err, "failed to add location_schedule")
 	}
@@ -30,8 +30,8 @@ func AddLocationSchedule(ls LocationSchedule) (LocationSchedule, error) {
 	return ls, nil
 }
 
-func ListLocationSchedules(locationID ID, from *time.Time, to *time.Time, coordinatorID *ID) ([]LocationSchedule, error) {
-	sql := "SELECT `id`,`location_id`,`open_time`,`close_time`,`coordinator_id` FROM `location_schedules` WHERE `location_id`=?"
+func ListLocationSchedules(locationID ID, from *time.Time, to *time.Time, memberID *ID) ([]LocationSchedule, error) {
+	sql := "SELECT `id`,`location_id`,`open_time`,`close_time`,`member_id` FROM `location_schedules` WHERE `location_id`=?"
 	args := []interface{}{locationID}
 
 	if from != nil {
@@ -44,9 +44,9 @@ func ListLocationSchedules(locationID ID, from *time.Time, to *time.Time, coordi
 		args = append(args, *to)
 	}
 
-	if coordinatorID != nil {
-		sql += " AND coordinator_id=?"
-		args = append(args, *coordinatorID)
+	if memberID != nil {
+		sql += " AND member_id=?"
+		args = append(args, *memberID)
 	}
 
 	sql += " ORDER BY open_time"

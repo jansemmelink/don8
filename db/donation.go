@@ -37,7 +37,7 @@ func AddDonation(d Donation) (Donation, error) {
 
 		r, err := GetRequest(*d.RequestID)
 		if err != nil {
-			return Donation{}, errors.Wrapf(err, "failed to get request(id=%s)")
+			return Donation{}, errors.Wrapf(err, "failed to get request(id=%s)", *d.RequestID)
 		}
 		request = &r
 		if d.Title != "" && d.Title != request.Title {

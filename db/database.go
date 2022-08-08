@@ -211,14 +211,15 @@ type HookBegin struct{}
 
 // Before hook will print the query with it's args and return the context with the timestamp
 func (h Hooks) Before(ctx context.Context, query string, args ...interface{}) (context.Context, error) {
-	log.Infof("SQL... %s (%d args=%+v)", query, len(args), args)
+	//jsonArgs, _ := json.Marshal(args)
+	//log.Infof("SQL... %s (%d args=%s)", query, len(args), string(jsonArgs))
 	return context.WithValue(ctx, HookBegin{}, time.Now()), nil
 }
 
 // After hook will get the timestamp registered on the Before hook and print the elapsed time
 func (h Hooks) After(ctx context.Context, query string, args ...interface{}) (context.Context, error) {
-	begin := ctx.Value(HookBegin{}).(time.Time)
-	log.Infof("SQL (dur: %s) %s (%d args=%+v)", time.Since(begin), query, len(args), args)
+	//begin := ctx.Value(HookBegin{}).(time.Time)
+	//log.Infof("SQL (dur: %s) %s (%d args=%+v)", time.Since(begin), query, len(args), args)
 	return ctx, nil
 }
 

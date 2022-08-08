@@ -7,23 +7,32 @@ import (
 )
 
 func TestUsers(t *testing.T) {
+	//todo: nead to test in a clean db! consider using sqlite for testing
 	u1, err := db.AddUser(db.User{
 		Name:  "Jan Semmelink",
-		Phone: "0824526299",
+		Phone: "0821111111",
+		Email: "jan.1111111@gmail.com",
 	})
 	if err != nil {
 		t.Fatalf("failed: %+v", err)
 	}
 	t.Logf("u1: %+v", u1)
+	defer func() {
+		db.DelUser(u1.ID)
+	}()
 
 	u2, err := db.AddUser(db.User{
 		Name:  "Koos",
 		Phone: "0821234567",
+		Email: "Koos@gmail.com",
 	})
 	if err != nil {
 		t.Fatalf("failed: %+v", err)
 	}
 	t.Logf("u2: %+v", u2)
+	defer func() {
+		db.DelUser(u2.ID)
+	}()
 
 	for _, filter := range []string{"Jan", "Koos", "082"} {
 		users, err := db.FindUsers(filter, 10)
@@ -50,7 +59,4 @@ func TestUsers(t *testing.T) {
 			t.Fatalf("u2!=u: %+v", err)
 		}
 	}
-
-	db.DelUser(u2.ID)
-	db.DelUser(u1.ID)
 }

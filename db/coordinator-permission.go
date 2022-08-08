@@ -4,29 +4,29 @@ import "github.com/go-msvc/errors"
 
 type Permission string
 
-type CoordinatorPermission struct {
-	CoordinatorID ID
-	Permission    Permission
+type MemberPermission struct {
+	MemberID   ID
+	Permission Permission
 }
 
-func AddCoordinatorPermission(cp CoordinatorPermission) (CoordinatorPermission, error) {
+func AddMemberPermission(cp MemberPermission) (MemberPermission, error) {
 	if _, err := db.Exec(
-		"INSERT INTO `coordinator_permissions` SET coordinator_id=?,permission=?",
-		cp.CoordinatorID,
+		"INSERT INTO `member_permissions` SET member_id=?,permission=?",
+		cp.MemberID,
 		cp.Permission,
 	); err != nil {
-		return CoordinatorPermission{}, errors.Wrapf(err, "failed to add coordinator permission")
+		return MemberPermission{}, errors.Wrapf(err, "failed to add member permission")
 	}
 	return cp, nil
 }
 
-func ListCoordinatorPermissions(coordinatorID ID) ([]Permission, error) {
-	var cps []CoordinatorPermission
+func ListMemberPermissions(memberID ID) ([]Permission, error) {
+	var cps []MemberPermission
 	if err := db.Select(&cps,
-		"SELECT FROM `coordinator_permissions` WHERE coordinator_id=? ORDER BY permission",
-		coordinatorID,
+		"SELECT FROM `member_permissions` WHERE member_id=? ORDER BY permission",
+		memberID,
 	); err != nil {
-		return nil, errors.Wrapf(err, "failed to list coordinator permissions")
+		return nil, errors.Wrapf(err, "failed to list member permissions")
 	}
 	list := make([]Permission, len(cps))
 	for i, cp := range cps {
@@ -35,13 +35,13 @@ func ListCoordinatorPermissions(coordinatorID ID) ([]Permission, error) {
 	return list, nil
 }
 
-func DelCoordinatorPermission(coordinatorID ID, permissionList []Permission) error {
+func DelMemberPermission(memberID ID, permissionList []Permission) error {
 	if len(permissionList) == 1 && permissionList[0] == "*" {
 		if _, err := db.Exec(
-			"DELETE FROM `coordinator_permissions` WHERE coordinator_id=?",
-			coordinatorID,
+			"DELETE FROM `member_permissions` WHERE member_id=?",
+			memberID,
 		); err != nil {
-			return errors.Wrapf(err, "failed to delete all permissions for coordinator(id=%s)", coordinatorID)
+			return errors.Wrapf(err, "failed to delete all permissions for member(id=%s)", memberID)
 		}
 		return nil
 	} //if delete all
@@ -49,11 +49,11 @@ func DelCoordinatorPermission(coordinatorID ID, permissionList []Permission) err
 	//delete selected permissions
 	for _, p := range permissionList {
 		if _, err := db.Exec(
-			"DELETE FROM `coordinator_permissions` WHERE coordinator_id=? AND permission=?",
-			coordinatorID,
+			"DELETE FROM `member_permissions` WHERE member_id=? AND permission=?",
+			memberID,
 			p,
 		); err != nil {
-			return errors.Wrapf(err, "failed to delete coordinator(id=%s) permission(%s)", coordinatorID, p)
+			return errors.Wrapf(err, "failed to delete member(id=%s) permission(%s)", memberID, p)
 		}
 	}
 	return nil

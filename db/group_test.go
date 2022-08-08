@@ -6,29 +6,44 @@ import (
 	"github.com/jansemmelink/don8/db"
 )
 
-func Test1(t *testing.T) {
-	g1, err := db.AddGroup(db.Group{
+func TestGroups(t *testing.T) {
+	u, err := db.AddUser(db.User{Name: "A", Phone: "0821111111", Email: "a@b.c"})
+	if err != nil {
+		t.Fatalf("failed to create user for group member")
+	}
+	defer func() {
+		db.DelUser(u.ID)
+	}()
+
+	desc1 := "Afrikaans Hoër Seuns/Meisies Skole in Pretoria"
+	g1, err := db.AddGroup(u, db.NewGroup{
 		Title:       "AHS/AHMP",
-		Description: "Afrikaans Hoër Seuns/Meisies Skole in Pretoria",
+		Description: &desc1,
 	})
 	if err != nil {
 		t.Fatalf("failed: %+v", err)
 	}
+	defer func() {
+		db.DelGroup(g1.ID)
+	}()
 	t.Logf("g1: %+v", g1)
 
-	g2, err := db.AddGroup(db.Group{
+	desc2 := "Jaarlikse Wildsfees op 13 Aug 2022 vir die skool se fondsinsameling."
+	g2, err := db.AddGroup(u, db.NewGroup{
 		ParentGroupID: g1.ID,
-		ParentTitle:   g1.Title,
 		Title:         "Wildsfees 2022",
-		Description:   "Jaarlikse Wildsfees op 13 Aug 2022 vir die skool se fondsinsameling.",
+		Description:   &desc2,
 	})
 	if err != nil {
 		t.Fatalf("failed: %+v", err)
 	}
 	t.Logf("g2: %+v", g2)
+	defer func() {
+		db.DelGroup(g2.ID)
+	}()
 
 	for _, filter := range []string{"AHS", "AHMP", "Wildsfees"} {
-		groups, err := db.FindGroups(filter, 10)
+		groups, err := db.MyGroups(u, filter, nil, nil)
 		if err != nil {
 			t.Fatalf("failed to find %s: %+v", filter, err)
 		}
@@ -52,7 +67,4 @@ func Test1(t *testing.T) {
 			t.Fatalf("g2!=g: %+v", err)
 		}
 	}
-
-	db.DelGroup(g2.ID)
-	db.DelGroup(g1.ID)
 }

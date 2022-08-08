@@ -1,0 +1,49 @@
+[
+    {"method":"POST", "url":"/charities", "body":{"name":"Pretoria Boys", "location":"pretoria"}},
+    {"method":"POST", "url":"/charities", "body":{"name":"Midrand Kids", "location":"midrand"}},
+    {"method":"POST", "url":"/charities", "body":{"name":"Jhb Girls Protection", "location":"johannesburg"}},
+    {"method":"POST", "url":"/charities", "body":{"name":"Randburg Youth", "location":"randburg"}},
+
+    {"method":"POST", "url":"/distribution_centres", "body":{"name":"shed1", "location":"pretoria"}},
+    {"method":"POST", "url":"/distribution_centres", "body":{"name":"shed2", "location":"johannesburg"}},
+
+    {"method":"POST", "url":"/items", "body":{"name":"clothing", "option":{"size":["0-1","1-2","3-4","5-6","7-8","9-11","12-14","S","M","L","XL","XXL","XXX"], "gender":["boy","girl"], "type":["shirt","shorts","trousers","jacket","socks","shoes","beany","scarf"],"condition":["new","used"]}}},
+    {"method":"POST", "url":"/items", "body":{"name":"canned food", "option":{"type":["beans","corn","soup","ideal milk","fruit cocktail","tuna"], "size":["small","medium","large"]}}},
+    {"method":"POST", "url":"/items", "body":{"name":"blanket", "option":{"size":["small", "single", "double"], "type":["fliece", "luxury", "flint"]}}},
+
+    {"method":"POST", "url":"/donations", "body":{"from":"anonymous", "dc":"shed1", "items":[
+        {"type":"clothing", "options":{"size":"9-11", "gender":"boy", "type":"shirt", "condition":"used"}, "quantity":5},
+        {"type":"clothing", "options":{"size":"9-11", "gender":"boy", "type":"shorts", "condition":"used"}, "quantity":2},
+        {"type":"clothing", "options":{"size":"9-11", "gender":"boy", "type":"shoes", "condition":"used"}, "quantity":2},
+        {"type":"clothing", "options":{"size":"9-11", "gender":"boy", "type":"beany", "condition":"used"}, "quantity":1}
+    ]}},
+
+    {"method":"POST", "url":"/donations", "body":{"from":"anonymous", "dc":"shed2", "items":[
+        {"type":"clothing", "options":{"size":"3-4", "gender":"boy", "type":"shirt", "condition":"used"}, "quantity":3}
+    ]}},
+
+    {"method":"POST", "url":"/donations", "body":{"from":"anonymous", "dc":"shed2", "items":[
+        {"type":"clothing", "options":{"size":"12-14", "gender":"girl", "type":"shirt", "condition":"new"}, "quantity":10},
+        {"type":"clothing", "options":{"size":"12-14", "gender":"girl", "type":"shorts", "condition":"new"}, "quantity":10}
+    ]}},
+
+    {"method":"POST", "url":"/wishes", "body":{"from":"Pretoria Boys", "items":[
+        {"type":"clothing", "options":{"genders":["boy"], "sizes":["9-11","12-14","S","M","L"],"types":[],"conditions":[]}, "quantity":100}
+    ]}},
+
+    {"method":"POST", "url":"/allocations", "body":{"from":"<donation id>", "items":[
+        {"donation":"id of donation", "id":"<id of item ...>", "quantity":5},
+        {"donation":"id of donation", "id":"<id of item ...>", "quantity":2},
+        {"donation":"id of donation", "id":"<id of item ...>", "quantity":2},
+        {"donation":"id of donation", "id":"<id of item ...>", "quantity":1}
+    ]}},
+
+    {"method":"POST", "url":"/collections", "body":{"id":"...from QR or entered...", "items":[
+        {"allocation_id":"...", "quantity":5},
+        {"allocation_id":"...", "quantity":2},
+        {"allocation_id":"...", "quantity":1, "comment":"1 missing"},
+        {"allocation_id":"...", "quantity":0, "comment":"1 spoiled with filth"}
+    ]}},
+
+    {}
+]
