@@ -75,7 +75,7 @@ func Login(req LoginRequest) (Session, error) {
 	}
 	pwdHash := HashPassword(req.Email, req.Password)
 	if *user.PwdHash != pwdHash {
-		log.Errorf("user(id:%s, email:%s) wrong password(%s)->%s != %s", user.ID, user.Email, req.Password, pwdHash, user.PwdHash)
+		log.Errorf("user(id:%s, email:%s) wrong password(%s)->%s != %s", user.ID, user.Email, req.Password, pwdHash, *user.PwdHash)
 		return Session{}, errors.Errorc(http.StatusUnauthorized, "wrong password")
 	}
 	return NewSession(user)

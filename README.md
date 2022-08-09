@@ -6,10 +6,24 @@ Written with Affies Wildsfees in mind...
 
 # Status
 ## Progress
-* Authing the user on certain API e.g. to create group else unauthorized + error message
-* Created API to create group with user as member with all permissions
+* Auth is kind of working: can register, get email, can activate and can login. Need to test a bit more...
+* Can create groups and child groups and navigate between then
+* Can list own groups and open from the list
 
 ## Next
+* Dev: Create more users and switch between users in my dev app
+* Disable [logout] nav link when user opted for random password - as user won't be able to login again? Or check that can login again with cached password... switch on auto complete in the login form...
+* Generate a link to invite others to a group, send in email and prompt to join the group
+* Send link to an email list
+* Attach named email lists to a group (e.g. to Affies) and update the list from time to time.
+* Dynamic list of those who joined and those who did not join...
+* Create group requests
+* Promise something
+* Receive something
+* Show request status
+* Generate a report to send to all members or send as PDF from school to mailing list
+
+* Fix Group title/desc updates
 * App: Coordinator: Create groups and list my groups
 * App: Coordinator: Create child groups and list my child groups
 * App: Filter group list by text

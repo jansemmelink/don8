@@ -44,10 +44,6 @@ func AddDonation(d Donation) (Donation, error) {
 			return Donation{}, errors.Errorf("donation.title(%s) != donation.request.title(%s)", d.Title, request.Title)
 		}
 		d.Title = request.Title
-		if d.Unit != "" && d.Unit != request.Unit {
-			return Donation{}, errors.Errorf("donation.unit(%s) != donation.request.unit(%s)", d.Unit, request.Unit)
-		}
-		d.Unit = request.Unit
 	}
 
 	//Title and Unit must be specified or be obtained from the request

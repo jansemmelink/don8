@@ -1,6 +1,7 @@
 package db
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/go-msvc/errors"
@@ -8,24 +9,79 @@ import (
 )
 
 type Request struct {
-	ID          ID     `db:"id"`
-	GroupID     ID     `db:"group_id"`
-	Title       string `db:"title"`
-	Description string `db:"description"`
-	Tags        string `db:"tags" doc:"Written as |<tag>|<tag>|...| so we can search with SQL tags like \"|<sometag>|\""`
-	Unit        string `db:"unit" doc:"Unit of measurement, e.g. \"items\" or \"kg\" or \"L\" or \"dozen\" etc..."`
-	Qty         int    `db:"qty" doc:"Quantity requested in total from all donars"`
+	ID          ID      `json:"id" db:"id"`
+	GroupID     ID      `json:"group_id" db:"group_id"`
+	Title       string  `json:"title" db:"title"`
+	Description *string `json:"description" db:"description"`
+	Tags        *string `json:"tags" db:"tags" doc:"Written as |<tag>|<tag>|...| so we can search with SQL tags like \"|<sometag>|\""`
+	Units       *string `json:"units" db:"units" doc:"Unit of measurement, e.g. \"items\" or \"kg\" or \"L\" or \"dozen\" etc..."`
+	Qty         int     `json:"qty" db:"qty" doc:"Quantity requested in total from all donars"`
+}
+
+func TagsFromString(s string) []string {
+	s = strings.ReplaceAll(s, ",", "|")
+	s = strings.ReplaceAll(s, " ", "|")
+	tags := strings.Split(s, "|")
+	for i := 0; i < len(tags); i++ {
+		tags[i] = strings.TrimSpace(tags[i])
+	}
+	nonEmptyTags := []string{}
+	for _, t := range tags {
+		if t != "" {
+			nonEmptyTags = append(nonEmptyTags, t)
+		}
+	}
+	return nonEmptyTags
+}
+
+func tagString(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	return "|" + strings.Join(tags, "|") + "|"
+}
+
+func (req *Request) Validate() error {
+	if req.GroupID == "" {
+		return errors.Errorf("missing group_id")
+	}
+	if req.Title == "" {
+		return errors.Errorf("missing title")
+	}
+	//Description is optional, but remove outer spaces
+	if req.Description != nil {
+		*req.Description = strings.TrimSpace(*req.Description)
+		if *req.Description == "" {
+			req.Description = nil
+		}
+	}
+	//Tags are optional, but convert to valid pipe-separated tags
+	if req.Tags != nil {
+		tags := tagString(TagsFromString(*req.Tags))
+		if tags != "" {
+			req.Tags = &tags
+		} else {
+			req.Tags = nil
+		}
+	}
+	if req.Qty < 1 {
+		return errors.Errorf("missing qty")
+	}
+	return nil
 }
 
 func AddRequest(r Request) (Request, error) {
+	if err := r.Validate(); err != nil {
+		return Request{}, errors.Errorc(http.StatusBadRequest, err.Error())
+	}
 	id := uuid.New().String()
-	if _, err := db.Exec("INSERT INTO `requests` SET `id`=?,`group_id`=?,`title`=?,`description`=?,`tags`=?,`unit`=?,`qty`=?",
+	if _, err := db.Exec("INSERT INTO `requests` SET `id`=?,`group_id`=?,`title`=?,`description`=?,`tags`=?,`units`=?,`qty`=?",
 		id,
 		r.GroupID,
 		r.Title,
 		r.Description,
 		r.Tags,
-		r.Unit,
+		r.Units,
 		r.Qty,
 	); err != nil {
 		return Request{}, errors.Wrapf(err, "failed to add request")
@@ -35,7 +91,7 @@ func AddRequest(r Request) (Request, error) {
 }
 
 func FindRequests(groupID ID, filter string, tags []string, limit int) ([]Request, error) {
-	sql := "SELECT id,group_id,title,description,tags,unit,qty FROM `requests` WHERE `group_id`=?"
+	sql := "SELECT id,group_id,title,description,tags,units,qty FROM `requests` WHERE `group_id`=?"
 	args := []interface{}{groupID}
 
 	if filter != "" {
@@ -70,7 +126,7 @@ func FindRequests(groupID ID, filter string, tags []string, limit int) ([]Reques
 
 func GetRequest(id ID) (Request, error) {
 	var request Request
-	if err := db.Get(&request, "SELECT id,group_id,title,description,tags,unit,qty FROM requests WHERE id=?", id); err != nil {
+	if err := db.Get(&request, "SELECT id,group_id,title,description,tags,units,qty FROM requests WHERE id=?", id); err != nil {
 		return Request{}, errors.Wrapf(err, "failed to get request(id=%s)", id)
 	}
 	return request, nil

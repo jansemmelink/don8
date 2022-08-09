@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/go-msvc/errors"
@@ -33,6 +34,10 @@ func main() {
 	r.HandleFunc("/group/{id}", hdlr(updGroup, authSession)).Methods(http.MethodPut)
 	r.HandleFunc("/groups", hdlr(addGroup, authSession)).Methods(http.MethodPost)
 	r.HandleFunc("/groups", hdlr(listGroups, authSession)).Methods(http.MethodGet)
+	//requests
+	r.HandleFunc("/requests", hdlr(addRequest, authSession)).Methods(http.MethodPost)
+	r.HandleFunc("/requests", hdlr(listRequests, authSession)).Methods(http.MethodGet)
+
 	http.Handle("/", Log(CORS(r)))
 
 	log.Infof("Listening on %s ...", *addrPtr)
@@ -118,13 +123,13 @@ func hdlr(fnc interface{}, auth authRequirment) http.HandlerFunc {
 			}
 		}()
 
-		params := map[string]string{}
+		params := newParams()
 		for n, v := range httpReq.URL.Query() {
-			params[n] = strings.Join(v, ",")
+			params = params.With(n, strings.Join(v, ","))
 		}
 		vars := mux.Vars(httpReq)
 		for n, v := range vars {
-			params[n] = v
+			params = params.With(n, v)
 		}
 		ctx = context.WithValue(ctx, CtxParams{}, params)
 
@@ -316,31 +321,30 @@ func addGroup(ctx context.Context, req db.NewGroup) (db.Group, error) {
 	return g, nil
 }
 
-type Filter struct {
-	Filter string `json:"filter"`
-}
-
 func listGroups(ctx context.Context) ([]db.MyGroup, error) {
 	s := ctx.Value(CtxAuthSession{}).(db.Session)
-	params := ctx.Value(CtxParams{}).(map[string]string)
-	filter := ""
-	if s, ok := params["filter"]; ok {
-		filter = s
-	}
+	params := ctx.Value(CtxParams{}).(params)
+	filter := params.String("filter", "")
 	return db.MyGroups(*s.User, filter, nil, nil)
 }
 
 //getGroup gives the app a good view of the group, including parent description and immediate child list
 func getGroup(ctx context.Context) (db.FullGroup, error) {
-	params := ctx.Value(CtxParams{}).(map[string]string)
+	params := ctx.Value(CtxParams{}).(params)
 	log.Infof("params: %+v", params)
-	id, ok := params["id"]
-	if !ok || id == "" {
+	id := params.String("id", "")
+	if id == "" {
 		return db.FullGroup{}, errors.Errorc(http.StatusBadRequest, "missing URL param id")
 	}
 	fg, err := db.GetFullGroup(db.ID(id))
 	if err != nil {
 		return db.FullGroup{}, errors.Errorc(http.StatusNotFound, "unknown group")
+	}
+
+	//load requests (can also filter on params)
+	if fg.Requests, err = listRequests(ctx); err != nil {
+		log.Errorf("failed to load group requests")
+		fg.Requests = nil
 	}
 	return fg, nil
 }
@@ -358,6 +362,65 @@ func updGroup(ctx context.Context, req db.UpdGroupRequest) (db.FullGroup, error)
 	return fg, nil
 }
 
+func addRequest(ctx context.Context, req db.Request) (db.Request, error) {
+	return db.AddRequest(req)
+}
+
+func listRequests(ctx context.Context) ([]db.Request, error) {
+	//s := ctx.Value(CtxAuthSession{}).(db.Session)
+	//todo: check must be member of group
+	params := ctx.Value(CtxParams{}).(params)
+	groupID := params.String("id", "")
+	if groupID == "" {
+		return nil, errors.Errorc(http.StatusBadRequest, "missing param id")
+	}
+	filter := params.String("filter", "")
+	tags := db.TagsFromString(params.String("tags", ""))
+	limit := params.Int("limit", 10, 1, 100)
+	return db.FindRequests(db.ID(groupID), filter, tags, limit)
+}
+
 type Validator interface {
 	Validate() error
+}
+
+type params struct {
+	value map[string]string
+}
+
+func newParams() params {
+	return params{
+		value: map[string]string{},
+	}
+}
+
+func (p params) With(n, v string) params {
+	p.value[n] = v
+	return p
+}
+
+func (p params) String(n, defaultValue string) string {
+	if s, ok := p.value[n]; !ok {
+		return defaultValue
+	} else {
+		return s
+	}
+}
+
+func (p params) Int(n string, defaultValue, minValue, maxValue int) int {
+	s, ok := p.value[n]
+	if !ok {
+		return defaultValue
+	}
+	i64, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return defaultValue
+	}
+	if int(i64) < minValue {
+		return minValue
+	}
+	if int(i64) > maxValue {
+		return maxValue
+	}
+	return int(i64)
 }

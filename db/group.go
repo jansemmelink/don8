@@ -178,7 +178,8 @@ func GetGroup(id ID) (Group, error) {
 type FullGroup struct {
 	Parent *Group `json:"parent,omitempty"`
 	Group
-	Children []Group `json:"children,omitempty"`
+	Requests []Request `json:"requests,omitempty"` //empty, but can be populated by calling Requests()
+	Children []Group   `json:"children,omitempty"`
 }
 
 func GetFullGroup(id ID) (FullGroup, error) {
