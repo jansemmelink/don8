@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -211,8 +212,8 @@ type HookBegin struct{}
 
 // Before hook will print the query with it's args and return the context with the timestamp
 func (h Hooks) Before(ctx context.Context, query string, args ...interface{}) (context.Context, error) {
-	//jsonArgs, _ := json.Marshal(args)
-	//log.Infof("SQL... %s (%d args=%s)", query, len(args), string(jsonArgs))
+	jsonArgs, _ := json.Marshal(args)
+	log.Infof("SQL... %s (%d args=%s)", query, len(args), string(jsonArgs))
 	return context.WithValue(ctx, HookBegin{}, time.Now()), nil
 }
 

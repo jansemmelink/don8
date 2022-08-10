@@ -258,9 +258,12 @@ func UpdGroup(req UpdGroupRequest) error {
 	if changes < 1 {
 		return errors.Errorf("no changes specified")
 	}
+	//finish the query SQL then exec
+	sql += " WHERE `id`=?"
+	args = append(args, req.ID)
 	_, err := db.Exec(sql, args...)
 	if err != nil {
-		log.Errorf("failed to update group: %+v", err)
+		log.Errorf("failed to update group(id:%s): %+v", req.ID, err)
 		return errors.Errorf("failed to update")
 	}
 

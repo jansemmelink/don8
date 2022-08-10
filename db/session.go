@@ -136,7 +136,7 @@ func GetSession(sid ID) (Session, error) {
 		return Session{}, errors.Errorf("failed to extend session")
 	}
 	if n, _ := result.RowsAffected(); n != 1 {
-		log.Errorf("extend affected %d rows", n)
+		log.Errorf("failed to extend session(id:%s) affected %d rows", sid, n)
 		return Session{}, errors.Errorf("failed to extend session")
 	}
 

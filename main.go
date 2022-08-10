@@ -35,6 +35,8 @@ func main() {
 	r.HandleFunc("/groups", hdlr(addGroup, authSession)).Methods(http.MethodPost)
 	r.HandleFunc("/groups", hdlr(listGroups, authSession)).Methods(http.MethodGet)
 	//requests
+	r.HandleFunc("/request/{id}", hdlr(getRequest, authSession)).Methods(http.MethodGet)
+	r.HandleFunc("/request/{id}", hdlr(updRequest, authSession)).Methods(http.MethodPut)
 	r.HandleFunc("/requests", hdlr(addRequest, authSession)).Methods(http.MethodPost)
 	r.HandleFunc("/requests", hdlr(listRequests, authSession)).Methods(http.MethodGet)
 
@@ -377,7 +379,69 @@ func listRequests(ctx context.Context) ([]db.Request, error) {
 	filter := params.String("filter", "")
 	tags := db.TagsFromString(params.String("tags", ""))
 	limit := params.Int("limit", 10, 1, 100)
-	return db.FindRequests(db.ID(groupID), filter, tags, limit)
+	requests, err := db.FindRequests(db.ID(groupID), filter, tags, limit)
+	if err != nil {
+		return nil, err
+	}
+	for i, r := range requests {
+		if r.Tags != nil {
+			tags := db.TagsCSV(db.TagsFromString(*r.Tags))
+			if tags != "" {
+				requests[i].Tags = &tags
+			} else {
+				requests[i].Tags = nil
+			}
+		}
+	}
+	return requests, nil
+}
+
+//getRequest including group title and summary of receives and promises etc...
+func getRequest(ctx context.Context) (db.FullRequest, error) {
+	params := ctx.Value(CtxParams{}).(params)
+	log.Infof("params: %+v", params)
+	id := params.String("id", "")
+	if id == "" {
+		return db.FullRequest{}, errors.Errorc(http.StatusBadRequest, "missing URL param id")
+	}
+	fr, err := db.GetFullRequest(db.ID(id))
+	if err != nil {
+		log.Errorf("failed to get full request(%s): %+v", id, err)
+		return db.FullRequest{}, errors.Errorc(http.StatusNotFound, "unknown request")
+	}
+
+	//present tags as CSV in the API
+	if fr.Tags != nil {
+		tags := db.TagsCSV(db.TagsFromString(*fr.Tags))
+		if tags != "" {
+			*fr.Tags = tags
+		} else {
+			fr.Tags = nil
+		}
+	}
+	return fr, nil
+}
+
+func updRequest(ctx context.Context, req db.UpdRequestRequest) (db.FullRequest, error) {
+	//todo: check permission on this group
+	if err := db.UpdRequest(req); err != nil {
+		return db.FullRequest{}, errors.Errorf("failed to update request")
+	}
+	fr, err := db.GetFullRequest(req.ID)
+	if err != nil {
+		log.Errorf("failed to get request after update: %+v", err)
+		return db.FullRequest{}, errors.Errorf("failed to get request after update")
+	}
+	//present tags as CSV in the API
+	if fr.Tags != nil {
+		tags := db.TagsCSV(db.TagsFromString(*fr.Tags))
+		if tags != "" {
+			*fr.Tags = tags
+		} else {
+			fr.Tags = nil
+		}
+	}
+	return fr, nil
 }
 
 type Validator interface {

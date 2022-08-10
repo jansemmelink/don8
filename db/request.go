@@ -34,11 +34,17 @@ func TagsFromString(s string) []string {
 	return nonEmptyTags
 }
 
-func tagString(tags []string) string {
+//tagString return "|xxx|yyy|zzz|" as we store tags in the db for easy match with SQL like %"|xxx|"%
+func tagsDbString(tags []string) string {
 	if len(tags) == 0 {
 		return ""
 	}
 	return "|" + strings.Join(tags, "|") + "|"
+}
+
+//tagCSV return "xxx,yyy,zzz" as we display tags to the API
+func TagsCSV(tags []string) string {
+	return strings.Join(tags, ",")
 }
 
 func (req *Request) Validate() error {
@@ -57,7 +63,7 @@ func (req *Request) Validate() error {
 	}
 	//Tags are optional, but convert to valid pipe-separated tags
 	if req.Tags != nil {
-		tags := tagString(TagsFromString(*req.Tags))
+		tags := tagsDbString(TagsFromString(*req.Tags))
 		if tags != "" {
 			req.Tags = &tags
 		} else {
@@ -138,3 +144,148 @@ func DelRequest(id ID) error {
 	}
 	return nil
 }
+
+type FullRequest struct {
+	Group Group `json:"group"`
+	Request
+	Promises []Promise `json:"promises,omitempty"`
+	//Receives []Receive `json:"receives,omitempty"`
+}
+
+func GetFullRequest(id ID) (FullRequest, error) {
+	r, err := GetRequest(id)
+	if err != nil {
+		return FullRequest{}, err
+	}
+	g, err := GetGroup(r.GroupID)
+	if err != nil {
+		return FullRequest{}, err
+	}
+	fr := FullRequest{
+		Group:   g,
+		Request: r,
+		//		Promises: []Promise{},
+	}
+	// if err := db.Select(&fr.Promises, "SELECT id,parent_group_id,title,description FROM `groups` WHERE `parent_group_id`=? ORDER BY `title`", id); err != nil {
+	// 	log.Errorf("failed to read group(%s).children: %+v", id, err)
+	// }
+
+	//return tags as CSV to the API
+	return fr, nil
+} //GetFullRequest()
+
+type UpdRequestRequest struct {
+	ID          ID      `json:"id"`
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Tags        *string `json:"tags,omitempty"`
+	Units       *string `json:"units,omitempty"`
+	Qty         *int    `json:"qty,omitempty"`
+}
+
+func (req *UpdRequestRequest) Validate() error {
+	if req.ID == "" {
+		return errors.Errorf("missing id")
+	}
+	if req.Title != nil {
+		*req.Title = strings.TrimSpace(*req.Title)
+		if *req.Title == "" {
+			return errors.Errorf("empty title not allowed")
+		}
+	}
+	if req.Description != nil {
+		*req.Description = strings.TrimSpace(*req.Description)
+		//allow empty description...
+		// if *req.Description == "" {
+		// 	return errors.Errorf("empty description not allowed")
+		// }
+	}
+
+	//Tags are optional, but convert to valid pipe-separated tags
+	if req.Tags != nil {
+		tags := tagsDbString(TagsFromString(*req.Tags))
+		if tags != "" {
+			*req.Tags = tags
+		} else {
+			req.Tags = nil
+		}
+	}
+	if req.Units != nil {
+		*req.Units = strings.TrimSpace(*req.Units) //empty units are allowed
+	}
+	if req.Qty != nil {
+		if *req.Qty < 0 {
+			return errors.Errorf("invalid new qty:%d", *req.Qty)
+		}
+	}
+	return nil
+}
+
+func UpdRequest(req UpdRequestRequest) error {
+	sql := "UPDATE `requests` SET"
+	args := []interface{}{}
+	changes := 0
+	if req.Title != nil && *req.Title != "" {
+		if changes > 0 {
+			sql += ","
+		} else {
+			sql += " "
+		}
+		sql += "`title`=?"
+		args = append(args, *req.Title)
+		changes++
+	}
+	if req.Description != nil { //may be ""
+		if changes > 0 {
+			sql += ","
+		} else {
+			sql += " "
+		}
+		sql += "`description`=?"
+		args = append(args, *req.Description)
+		changes++
+	}
+	if req.Tags != nil { //may be ""
+		if changes > 0 {
+			sql += ","
+		} else {
+			sql += " "
+		}
+		sql += "`tags`=?"
+		args = append(args, *req.Tags)
+		changes++
+	}
+	if req.Units != nil { //may be ""
+		if changes > 0 {
+			sql += ","
+		} else {
+			sql += " "
+		}
+		sql += "`units`=?"
+		args = append(args, *req.Description)
+		changes++
+	}
+	if req.Qty != nil { //may be 0
+		if changes > 0 {
+			sql += ","
+		} else {
+			sql += " "
+		}
+		sql += "`qty`=?"
+		args = append(args, *req.Qty)
+		changes++
+	}
+	if changes < 1 {
+		return errors.Errorf("no changes specified")
+	}
+
+	//finish the query SQL then exec
+	sql += " WHERE `id`=?"
+	args = append(args, req.ID)
+	_, err := db.Exec(sql, args...)
+	if err != nil {
+		log.Errorf("failed to update request: %+v", err)
+		return errors.Errorf("failed to update")
+	}
+	return nil
+} //UpdRequest()
