@@ -19,6 +19,14 @@ services:
             - "3311:3306"
         networks:
             - don8
+    redis:
+        image: redis
+        restart: unless-stopped
+        ports:
+            - "6379:6379"
+        networks:
+            - don8
+
 ############
 # NETWORKS #
 ############

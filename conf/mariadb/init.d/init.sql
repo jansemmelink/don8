@@ -9,6 +9,7 @@ DROP TABLE IF EXISTS `location_schedules`;
 DROP TABLE IF EXISTS `locations`;
 DROP TABLE IF EXISTS `member_permissions`;
 DROP TABLE IF EXISTS `members`;
+DROP TABLE IF EXISTS `invitations`;
 DROP TABLE IF EXISTS `groups`;
 DROP TABLE IF EXISTS `sessions`;
 DROP TABLE IF EXISTS `users`;
@@ -47,6 +48,18 @@ CREATE TABLE `groups` (
   UNIQUE KEY `group_id` (`id`),
   UNIQUE KEY `group_title` (`parent_group_id`,`title`),
   KEY `group_start` (`start`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+
+CREATE TABLE `invitations` (
+  `id` VARCHAR(40) NOT NULL,
+  `group_id` VARCHAR(40) NOT NULL,
+  `email` VARCHAR(100) NOT NULL,
+  `time_created` DATETIME NOT NULL,
+  `time_updated` DATETIME NOT NULL,
+  `status` VARCHAR(30) NOT NULL,
+  UNIQUE KEY `invitation_id` (`id`),
+  UNIQUE KEY `invitation_uniq` (`group_id`,`email`),
+  FOREIGN KEY (`group_id`) REFERENCES `groups`(`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 
 CREATE TABLE `members` (

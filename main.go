@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/go-msvc/errors"
+	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/jansemmelink/don8/db"
 	"github.com/jansemmelink/events/email"
@@ -19,36 +20,51 @@ import (
 
 var log = logger.New().WithLevel(logger.LevelDebug)
 
+var redisClient *redis.Client
+
+func init() {
+	redisClient = redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+}
+
 func main() {
 	addrPtr := flag.String("addr", ":3500", "HTTP Server address")
 	flag.Parse()
+
 	r := mux.NewRouter()
-	//auth
-	r.HandleFunc("/register", hdlr(register, authNone)).Methods(http.MethodPost)
-	r.HandleFunc("/activate", hdlr(activate, authNone)).Methods(http.MethodPost)
-	r.HandleFunc("/reset", hdlr(reset, authNone)).Methods(http.MethodPost)
-	r.HandleFunc("/login", hdlr(login, authNone)).Methods(http.MethodPost)
-	r.HandleFunc("/logout", hdlr(logout, authSession)).Methods(http.MethodPost)
-	//groups
-	r.HandleFunc("/group/{id}", hdlr(getGroup, authNone)).Methods(http.MethodGet) //no auth: given the uuid, you can see a group, e.g. from an invite
-	r.HandleFunc("/group/{id}", hdlr(updGroup, authSession)).Methods(http.MethodPut)
-	r.HandleFunc("/groups", hdlr(addGroup, authSession)).Methods(http.MethodPost)
-	r.HandleFunc("/groups", hdlr(listGroups, authSession)).Methods(http.MethodGet)
-	//requests
-	r.HandleFunc("/request/{id}", hdlr(getRequest, authSession)).Methods(http.MethodGet)
-	r.HandleFunc("/request/{id}", hdlr(updRequest, authSession)).Methods(http.MethodPut)
-	r.HandleFunc("/requests", hdlr(addRequest, authSession)).Methods(http.MethodPost)
-	r.HandleFunc("/requests", hdlr(listRequests, authSession)).Methods(http.MethodGet)
+	groupRoutes(r.PathPrefix("/groups/").Subrouter())
+	requestRoutes(r.PathPrefix("/requests/").Subrouter())
+	invitationRoutes(r.PathPrefix("/invitations/").Subrouter())
 
 	http.Handle("/", Log(CORS(r)))
-
 	log.Infof("Listening on %s ...", *addrPtr)
 	http.ListenAndServe(*addrPtr, nil)
 }
 
+func groupRoutes(r *mux.Router) {
+	r.HandleFunc("/", hdlr(listGroups, authSession)).Methods(http.MethodGet)
+	r.HandleFunc("/", hdlr(addGroup, authSession)).Methods(http.MethodPost)
+	r.HandleFunc("/{id}", hdlr(getGroup, authSession)).Methods(http.MethodGet)
+	r.HandleFunc("/{id}", hdlr(updGroup, authSession)).Methods(http.MethodPut)
+}
+
+func requestRoutes(r *mux.Router) {
+	r.HandleFunc("/", hdlr(listRequests, authSession)).Methods(http.MethodGet)
+	r.HandleFunc("/", hdlr(addRequest, authSession)).Methods(http.MethodPost)
+	r.HandleFunc("/{id}", hdlr(getRequest, authSession)).Methods(http.MethodGet)
+	r.HandleFunc("/{id}", hdlr(updRequest, authSession)).Methods(http.MethodPut)
+}
+
+func invitationRoutes(r *mux.Router) {
+	r.HandleFunc("/{id}", hdlr(sendInvites, authSession)).Methods(http.MethodPost)
+}
+
 func Log(h http.Handler) http.Handler {
-	//todo...
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Infof("HTTP %s %s", r.Method, r.URL.Path)
 		h.ServeHTTP(w, r)
 	})
 }
@@ -72,9 +88,10 @@ func CORS(h http.Handler) http.Handler {
 type authRequirment int
 
 const (
-	authNone authRequirment = iota
-	// authTpw
-	authSession
+	authNone    authRequirment = iota
+	authSession                //must be logged in user has a session and can call this api
+	authGroup                  //must be logged in and in the same group (URL path must include group_id)
+	authUser                   //must be logged in and in the same user (URL path must include user_id)
 )
 
 // type CtxAuthUser struct{}
@@ -443,6 +460,97 @@ func updRequest(ctx context.Context, req db.UpdRequestRequest) (db.FullRequest, 
 	}
 	return fr, nil
 }
+
+type invitesRequest struct {
+	From    string `json:"from"`
+	Emails  string `json:"emails" doc:"Email addresses could be space, new-line or comma separated"`
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
+}
+
+func (req *invitesRequest) Validate() error {
+	var err error
+	if req.From == "" {
+		return errors.Errorf("missing from")
+	}
+	if req.From, err = email.Valid(req.From); err != nil {
+		return errors.Wrapf(err, "invalid from(%s)", req.From)
+	}
+	if req.Subject == "" {
+		return errors.Errorf("missing subject")
+	}
+	if req.Body == "" {
+		return errors.Errorf("missing body")
+	}
+	return nil
+}
+
+type invitesResponse struct {
+	NrQueued      int      `json:"nr_queued" doc:"Nr of email addresses queued for processing"`
+	InvalidEmails []string `json:"invalid_emails" doc:"List of email addresses not queued for processing"`
+}
+
+func sendInvites(ctx context.Context, req invitesRequest) (invitesResponse, error) {
+	params := ctx.Value(CtxParams{}).(params)
+
+	groupID := db.ID(params.String("id", ""))
+	g, err := db.GetGroup(groupID)
+	if err != nil {
+		log.Errorf("failed to get group(id:%s): %+v", groupID, err)
+		return invitesResponse{}, errors.Errorf("group not found")
+	}
+	log.Debugf("group: %+v", g)
+
+	//todo: check if user is allowed to invite for this group
+
+	//sanitise the list of email addresses
+	req.Emails = strings.ReplaceAll(req.Emails, ",", " ")
+	req.Emails = strings.ReplaceAll(req.Emails, ";", " ")
+	req.Emails = strings.ReplaceAll(req.Emails, "|", " ")
+	req.Emails = strings.ReplaceAll(req.Emails, "\n", " ")
+	req.Emails = strings.ReplaceAll(req.Emails, "\r", " ")
+	list := strings.Split(req.Emails, " ")
+
+	//publish the invitations into redis for processing asynchronously
+	res := invitesResponse{
+		NrQueued:      0,
+		InvalidEmails: []string{},
+	}
+
+	log.Debugf("Got %d emails to process...", len(list))
+	for _, s := range list {
+		log.Debugf("Processing invitation email(%s) ...", s)
+		if s != "" {
+			log.Debugf("not empty(%s)", s)
+			validEmail, err := email.Valid(s)
+			if err != nil {
+				log.Debugf("group(id:%s) ignore invalid invited email(%s)", groupID, s)
+				res.InvalidEmails = append(res.InvalidEmails, s)
+				continue
+			}
+
+			//publish invitation for asynchronous processing
+			inv := db.Invitation{
+				GroupID: groupID,
+				Email:   validEmail,
+			}
+			jsonInvitation, _ := json.Marshal(inv)
+			redisCmd := redisClient.Publish(ctx, "Q:group-invitations", string(jsonInvitation))
+			log.Infof("publish: %+v", redisCmd.Result)
+
+			// 	log.Errorf("failed to queue email(%s) for processing: %+v", validEmail, err)
+			// 	return invitesResponse{}, errors.Errorf("failed to queue for processing")
+			// }
+			res.NrQueued++
+			log.Debugf("Queued email(%s) ...", validEmail)
+		}
+	} //for list of emails
+
+	if res.NrQueued == 0 && len(res.InvalidEmails) == 0 {
+		return invitesResponse{}, errors.Errorc(http.StatusBadRequest, "no emails=\"...\" to invite")
+	}
+	return res, nil
+} //sendInvites()
 
 type Validator interface {
 	Validate() error
